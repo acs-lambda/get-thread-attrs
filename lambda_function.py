@@ -13,12 +13,26 @@ def lambda_handler(event, context):
     Lambda handler that retrieves thread attributes for a given conversation.
     """
     try:
-        # Get conversation ID from the event
-        conversation_id = event.get('conversation_id')
+        # Parse the event body to get conversation ID
+        if not event.get('body'):
+            return {
+                'statusCode': 400,
+                'body': json.dumps('Missing request body')
+            }
+
+        try:
+            body = json.loads(event['body'])
+            conversation_id = body.get('conversationId')
+        except json.JSONDecodeError:
+            return {
+                'statusCode': 400,
+                'body': json.dumps('Invalid JSON in request body')
+            }
+
         if not conversation_id:
             return {
                 'statusCode': 400,
-                'body': json.dumps('Missing conversation_id in event')
+                'body': json.dumps('Missing conversationId in request body')
             }
 
         # Get the email chain
