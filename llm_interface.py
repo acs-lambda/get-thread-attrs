@@ -1,4 +1,5 @@
-import requests
+import json
+import urllib3
 import logging
 from typing import Dict, Any
 
@@ -9,6 +10,9 @@ logger.setLevel(logging.INFO)
 # Together AI configuration
 TAI_KEY = "2e1a1e910693ae18c09ad0585a7645e0f4595e90ec35bb366b6f5520221b6ca7"
 TAI_URL = "https://api.together.xyz/v1/chat/completions"
+
+# Initialize HTTP client
+http = urllib3.PoolManager()
 
 def get_thread_attributes(conversation_text: str) -> Dict[str, str]:
     """
@@ -48,12 +52,22 @@ Timeline: [timeline]"""
     }
 
     try:
-        response = requests.post(TAI_URL, headers=headers, json=payload)
-        response_data = response.json()
+        encoded_data = json.dumps(payload).encode('utf-8')
+        response = http.request(
+            'POST',
+            TAI_URL,
+            body=encoded_data,
+            headers=headers
+        )
 
-        if response.status_code != 200 or "choices" not in response_data:
-            logger.error(f"API call failed: {response_data}")
+        if response.status != 200:
+            logger.error(f"API call failed with status {response.status}: {response.data}")
             raise Exception("Failed to fetch response from Together AI API")
+
+        response_data = json.loads(response.data.decode('utf-8'))
+        if "choices" not in response_data:
+            logger.error(f"Invalid API response: {response_data}")
+            raise Exception("Invalid response from Together AI API")
 
         # Parse the response into a dictionary
         content = response_data["choices"][0]["message"]["content"]
