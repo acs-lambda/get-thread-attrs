@@ -20,15 +20,18 @@ TOGETHER_AI = {
 
 # LLM System Prompts
 SYSTEM_PROMPTS = {
-    'THREAD_ATTRIBUTES': """You are a helpful assistant that analyzes email conversations and extracts key attributes. For each conversation, provide the following attributes in a clear format:
+    'THREAD_ATTRIBUTES': """You are an AI assistant that analyzes real estate conversations. Extract the following attributes from the conversation:
 
-1. sentiment: The overall sentiment of the conversation (positive, negative, neutral)
-2. urgency: How urgent the conversation is (high, medium, low)
-3. complexity: How complex the conversation is (high, medium, low)
-4. topic: The main topic of the conversation
-5. action_required: Whether any action is required (yes, no)
+1. AI Summary: A concise phrase describing the current state of the conversation
+2. Budget Range: A 2-4 word description of the lead's budget (use "UNKNOWN" if not mentioned)
+3. Preferred Property Types: A maximum 5 word description of preferred property types (use "UNKNOWN" if not mentioned)
+4. Timeline: A 2-5 word description of the lead's timeline to buy
 
-Provide each attribute on a new line in the format 'attribute: value'"""
+Format your response exactly as:
+AI Summary: [summary]
+Budget Range: [budget]
+Preferred Property Types: [types]
+Timeline: [timeline]"""
 }
 
 # Logging Configuration

@@ -2,7 +2,8 @@ import json
 import urllib3
 import logging
 import time
-from typing import Dict, Any, Optional
+import re
+from typing import Dict, Any, Optional, Tuple
 from db import store_llm_invocation
 from config import get_together_ai_config, get_system_prompt, LOGGING_CONFIG
 
@@ -13,10 +14,118 @@ logger.setLevel(getattr(logging, LOGGING_CONFIG['LEVEL']))
 # Initialize urllib3 pool manager
 http = urllib3.PoolManager()
 
+# Define expected attributes and their validation rules
+EXPECTED_ATTRIBUTES = {
+    'AI Summary': {
+        'required': True
+    },
+    'Budget Range': {
+        'required': True,
+        'max_words': 4,
+        'min_words': 2,
+        'allowed_values': ['UNKNOWN']  # Special case for unknown values
+    },
+    'Preferred Property Types': {
+        'required': True,
+        'max_words': 5,
+        'min_words': 1,
+        'allowed_values': ['UNKNOWN']  # Special case for unknown values
+    },
+    'Timeline': {
+        'required': True,
+        'max_words': 5,
+        'min_words': 2
+    }
+}
+
+def clean_attribute_value(value: str) -> str:
+    """
+    Clean and normalize an attribute value.
+    """
+    # Remove extra whitespace
+    value = ' '.join(value.split())
+    # Remove any leading/trailing punctuation
+    value = value.strip('.,;:!?')
+    return value
+
+def validate_attribute(key: str, value: str) -> Tuple[bool, str]:
+    """
+    Validate an attribute value against its rules.
+    Returns (is_valid, error_message)
+    """
+    if key not in EXPECTED_ATTRIBUTES:
+        return False, f"Unexpected attribute: {key}"
+    
+    rules = EXPECTED_ATTRIBUTES[key]
+    value = clean_attribute_value(value)
+    
+    # Check required
+    if rules['required'] and not value:
+        return False, f"{key} is required"
+    
+    # Check word count
+    word_count = len(value.split())
+    if 'max_words' in rules and word_count > rules['max_words']:
+        return False, f"{key} exceeds maximum word count of {rules['max_words']}"
+    if 'min_words' in rules and word_count < rules['min_words']:
+        return False, f"{key} is below minimum word count of {rules['min_words']}"
+    
+    # Check allowed values
+    if 'allowed_values' in rules and value.upper() in [v.upper() for v in rules['allowed_values']]:
+        return True, ""
+    
+    return True, ""
+
+def parse_llm_response(content: str) -> Dict[str, str]:
+    """
+    Parse and validate the LLM response into a dictionary of attributes.
+    Returns a dictionary of validated attributes or raises ValueError if invalid.
+    """
+    logger.info("Parsing LLM response")
+    attributes = {}
+    errors = []
+    
+    # Split into lines and process each line
+    lines = [line.strip() for line in content.split('\n') if line.strip()]
+    
+    for line in lines:
+        if ':' not in line:
+            logger.warning(f"Skipping invalid line (no colon): {line}")
+            continue
+            
+        key, value = line.split(':', 1)
+        key = key.strip()
+        value = value.strip()
+        
+        # Clean and validate the attribute
+        value = clean_attribute_value(value)
+        is_valid, error_msg = validate_attribute(key, value)
+        
+        if is_valid:
+            attributes[key] = value
+            logger.debug(f"Validated attribute - {key}: {value}")
+        else:
+            errors.append(f"{key}: {error_msg}")
+            logger.warning(f"Invalid attribute - {key}: {value} - {error_msg}")
+    
+    # Check for missing required attributes
+    for key, rules in EXPECTED_ATTRIBUTES.items():
+        if rules['required'] and key not in attributes:
+            errors.append(f"Missing required attribute: {key}")
+            logger.warning(f"Missing required attribute: {key}")
+    
+    if errors:
+        error_msg = "Validation errors:\n" + "\n".join(errors)
+        logger.error(error_msg)
+        raise ValueError(error_msg)
+    
+    logger.info("Successfully parsed and validated all attributes")
+    return attributes
+
 def get_thread_attributes(conversation_text: str, account_id: Optional[str] = None, conversation_id: Optional[str] = None) -> Dict[str, str]:
     """
     Get thread attributes by analyzing conversation text using LLM.
-    Returns a dictionary of attributes.
+    Returns a dictionary of validated attributes.
     """
     start_time = time.time()
     logger.info(f"Starting thread attributes analysis for conversation_id: {conversation_id}")
@@ -36,7 +145,7 @@ def get_thread_attributes(conversation_text: str, account_id: Optional[str] = No
         },
         {
             "role": "user",
-            "content": f"Please analyze this email conversation and provide the attributes:\n\n{conversation_text}"
+            "content": f"Please analyze this real estate conversation and provide the attributes:\n\n{conversation_text}"
         }
     ]
 
@@ -54,7 +163,7 @@ def get_thread_attributes(conversation_text: str, account_id: Optional[str] = No
         logger.info(f"  Model: {payload['model']}")
         logger.info(f"  Temperature: {payload['temperature']}")
         logger.info(f"  Max Tokens: {payload['max_tokens']}")
-        logger.info(f"  System Prompt: {messages[0]['content'][:100]}...")  # Log first 100 chars of system prompt
+        logger.info(f"  System Prompt: {messages[0]['content'][:100]}...")
         logger.info(f"  User Message Length: {len(messages[1]['content'])} characters")
 
     try:
@@ -111,28 +220,30 @@ def get_thread_attributes(conversation_text: str, account_id: Optional[str] = No
             )
             logger.info(f"LLM invocation record storage: {'Success' if invocation_success else 'Failed'}")
 
-        # Parse the response into a dictionary
+        # Parse and validate the response
         content = response_data["choices"][0]["message"]["content"]
-        attributes = {}
-        for line in content.split('\n'):
-            if ':' in line:
-                key, value = line.split(':', 1)
-                attributes[key.strip()] = value.strip()
+        try:
+            attributes = parse_llm_response(content)
+            
+            if LOGGING_CONFIG['ENABLE_RESPONSE_LOGGING']:
+                logger.info("Extracted and validated Thread Attributes:")
+                for key, value in attributes.items():
+                    logger.info(f"  {key}: {value}")
 
-        if LOGGING_CONFIG['ENABLE_RESPONSE_LOGGING']:
-            logger.info("Extracted Thread Attributes:")
-            for key, value in attributes.items():
-                logger.info(f"  {key}: {value}")
+            total_duration = time.time() - start_time
+            if LOGGING_CONFIG['ENABLE_PERFORMANCE_LOGGING']:
+                logger.info(f"Total thread attributes analysis completed in {total_duration:.2f} seconds")
 
-        total_duration = time.time() - start_time
-        if LOGGING_CONFIG['ENABLE_PERFORMANCE_LOGGING']:
-            logger.info(f"Total thread attributes analysis completed in {total_duration:.2f} seconds")
-
-        return attributes
+            return attributes
+            
+        except ValueError as e:
+            logger.error(f"Failed to parse LLM response: {str(e)}")
+            logger.error(f"Raw LLM response: {content}")
+            raise
 
     except Exception as e:
         logger.error(f"Error in get_thread_attributes: {str(e)}", exc_info=True)
-        logger.error(f"Failed request details:")
+        logger.error("Error context:")
         logger.error(f"  Conversation ID: {conversation_id}")
         logger.error(f"  Account ID: {account_id}")
         logger.error(f"  Model: {payload['model']}")
