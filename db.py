@@ -297,18 +297,23 @@ def get_and_increment_rate_limit(account_id: str, table_name: str) -> int:
                 ':zero': 0,
                 ':inc': 1
             }
+            expression_names = {}
         else:
-            update_expression = "SET invocations = if_not_exists(invocations, :zero) + :inc, ttl = :ttl"
+            update_expression = "SET invocations = if_not_exists(invocations, :zero) + :inc, #ttl = :ttl"
             expression_values = {
                 ':zero': 0,
                 ':inc': 1,
                 ':ttl': ttl
+            }
+            expression_names = {
+                '#ttl': 'ttl'
             }
         
         response = table.update_item(
             Key={'associated_account': account_id},
             UpdateExpression=update_expression,
             ExpressionAttributeValues=expression_values,
+            ExpressionAttributeNames=expression_names,
             ReturnValues='UPDATED_NEW'
         )
         
