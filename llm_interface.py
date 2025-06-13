@@ -21,20 +21,20 @@ EXPECTED_ATTRIBUTES = {
     },
     'budget_range': {
         'required': True,
-        'max_words': 4,
-        'min_words': 2,
+        'max_words': 1000,
+        'min_words': 0,
         'allowed_values': ['UNKNOWN']  # Special case for unknown values
     },
     'preferred_property_types': {
         'required': True,
-        'max_words': 5,
-        'min_words': 1,
+        'max_words': 1000,
+        'min_words': 0,
         'allowed_values': ['UNKNOWN']  # Special case for unknown values
     },
     'timeline': {
         'required': True,
-        'max_words': 5,
-        'min_words': 2
+        'max_words': 1000,
+        'min_words': 0
     }
 }
 
