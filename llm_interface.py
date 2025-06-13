@@ -16,27 +16,35 @@ http = urllib3.PoolManager()
 
 # Define expected attributes and their validation rules
 EXPECTED_ATTRIBUTES = {
-    'AI Summary': {
+    'ai_summary': {
         'required': True
     },
-    'Budget Range': {
+    'budget_range': {
         'required': True,
         'max_words': 4,
         'min_words': 2,
         'allowed_values': ['UNKNOWN']  # Special case for unknown values
     },
-    'Preferred Property Types': {
+    'preferred_property_types': {
         'required': True,
         'max_words': 5,
         'min_words': 1,
         'allowed_values': ['UNKNOWN']  # Special case for unknown values
     },
-    'Timeline': {
+    'timeline': {
         'required': True,
         'max_words': 5,
         'min_words': 2
     }
 }
+
+def to_snake_case(s: str) -> str:
+    """
+    Convert a string to snake_case.
+    """
+    s = s.strip().replace('-', ' ').replace('.', ' ')
+    s = re.sub(r'(?<!^)(?=[A-Z])', '_', s).replace(' ', '_')
+    return s.lower()
 
 def clean_attribute_value(value: str) -> str:
     """
@@ -97,16 +105,19 @@ def parse_llm_response(content: str) -> Dict[str, str]:
         key = key.strip()
         value = value.strip()
         
+        # Normalize key to snake_case
+        key_snake = to_snake_case(key)
+        
         # Clean and validate the attribute
         value = clean_attribute_value(value)
-        is_valid, error_msg = validate_attribute(key, value)
+        is_valid, error_msg = validate_attribute(key_snake, value)
         
         if is_valid:
-            attributes[key] = value
-            logger.debug(f"Validated attribute - {key}: {value}")
+            attributes[key_snake] = value
+            logger.debug(f"Validated attribute - {key_snake}: {value}")
         else:
-            errors.append(f"{key}: {error_msg}")
-            logger.warning(f"Invalid attribute - {key}: {value} - {error_msg}")
+            errors.append(f"{key_snake}: {error_msg}")
+            logger.warning(f"Invalid attribute - {key_snake}: {value} - {error_msg}")
     
     # Check for missing required attributes
     for key, rules in EXPECTED_ATTRIBUTES.items():
