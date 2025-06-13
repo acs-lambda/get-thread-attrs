@@ -34,7 +34,18 @@ Provide each attribute on a new line in the format 'attribute: value'"""
 # Logging Configuration
 LOGGING_CONFIG = {
     'LEVEL': 'INFO',
-    'FORMAT': '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    'FORMAT': '%(asctime)s - %(name)s - %(levelname)s - [%(filename)s:%(lineno)d] - %(message)s',
+    'DATE_FORMAT': '%Y-%m-%d %H:%M:%S',
+    'LOG_LEVELS': {
+        'DEBUG': 10,
+        'INFO': 20,
+        'WARNING': 30,
+        'ERROR': 40,
+        'CRITICAL': 50
+    },
+    'ENABLE_REQUEST_LOGGING': True,
+    'ENABLE_RESPONSE_LOGGING': True,
+    'ENABLE_PERFORMANCE_LOGGING': True
 }
 
 # Lambda Configuration
