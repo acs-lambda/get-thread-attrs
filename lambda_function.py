@@ -3,7 +3,7 @@ import logging
 import time
 from typing import Dict, Any
 from db import get_email_chain, get_thread_account_id
-from llm_interface import get_thread_attributes, ValueError as LLMValidationError
+from llm_interface import get_thread_attributes
 from utils import format_conversation_for_llm
 from config import LOGGING_CONFIG
 
@@ -128,7 +128,7 @@ def lambda_handler(event, context):
                 }
             })
             
-        except LLMValidationError as e:
+        except ValueError as e:
             logger.error(f"LLM validation error: {str(e)}")
             return create_error_response(422, str(e), 'LLMValidationError')
         
