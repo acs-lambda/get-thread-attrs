@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from typing import Dict, Any
-from db import get_email_chain, get_thread_account_id
+from db import get_email_chain, get_thread_account_id, check_rate_limit
 from llm_interface import get_thread_attributes
 from utils import format_conversation_for_llm
 from config import LOGGING_CONFIG
@@ -85,6 +85,18 @@ def lambda_handler(event, context):
             logger.info(f"Found account_id {account_id} for conversation {conversation_id}")
         else:
             logger.warning(f"No account_id found for conversation {conversation_id}")
+            return create_error_response(404, 'Account not found for this conversation', 'AccountNotFound')
+
+        # Check AWS rate limit
+        logger.info("Checking AWS rate limit")
+        is_exceeded, current_count, limit = check_rate_limit(account_id, 'AWS')
+        if is_exceeded:
+            logger.warning(f"AWS rate limit exceeded for account {account_id}: {current_count}/{limit}")
+            return create_error_response(
+                429,
+                f'Rate limit exceeded. Current usage: {current_count}/{limit} AWS invocations.',
+                'RateLimitExceeded'
+            )
 
         # Get the email chain
         logger.info(f"Fetching email chain for conversation: {conversation_id}")
@@ -99,6 +111,17 @@ def lambda_handler(event, context):
         logger.info("Formatting conversation for LLM processing")
         conversation_text = format_conversation_for_llm(email_chain)
         logger.info(f"Formatted conversation length: {len(conversation_text)} characters")
+        
+        # Check AI rate limit before making the AI call
+        logger.info("Checking AI rate limit")
+        is_exceeded, current_count, limit = check_rate_limit(account_id, 'AI')
+        if is_exceeded:
+            logger.warning(f"AI rate limit exceeded for account {account_id}: {current_count}/{limit}")
+            return create_error_response(
+                429,
+                f'Rate limit exceeded. Current usage: {current_count}/{limit} AI invocations.',
+                'RateLimitExceeded'
+            )
         
         # Get thread attributes
         logger.info("Initiating thread attributes analysis")
