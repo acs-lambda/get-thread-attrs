@@ -4,10 +4,11 @@ from typing import Dict, Any
 from db import get_email_chain, get_thread_account_id
 from llm_interface import get_thread_attributes
 from utils import format_conversation_for_llm
+from config import LOGGING_CONFIG
 
 # Set up logging
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(getattr(logging, LOGGING_CONFIG['LEVEL']))
 
 def lambda_handler(event, context):
     """

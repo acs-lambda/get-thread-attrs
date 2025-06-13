@@ -3,10 +3,11 @@ import logging
 import time
 import uuid
 from typing import Dict, Any, List, Optional
+from config import get_table_name, LOGGING_CONFIG
 
 # Set up logging
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(getattr(logging, LOGGING_CONFIG['LEVEL']))
 
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb')
@@ -16,7 +17,7 @@ def get_email_chain(conversation_id: str) -> List[Dict[str, Any]]:
     Retrieves and formats the email chain for a conversation.
     Returns a list of dictionaries with consistent 'subject' and 'body' keys.
     """
-    table = dynamodb.Table('Conversations')
+    table = dynamodb.Table(get_table_name('CONVERSATIONS'))
     try:
         res = table.query(
             KeyConditionExpression='conversation_id = :cid',
@@ -70,7 +71,7 @@ def store_llm_invocation(
         if invocation_id:
             logger.info(f"  - Invocation ID: {invocation_id}")
         
-        invocations_table = dynamodb.Table('Invocations')
+        invocations_table = dynamodb.Table(get_table_name('INVOCATIONS'))
         
         # Create timestamp for sorting
         timestamp = int(time.time() * 1000)
@@ -126,7 +127,7 @@ def get_thread_account_id(conversation_id: str) -> Optional[str]:
     Returns None if the thread doesn't exist or there's an error.
     """
     try:
-        table = dynamodb.Table('Threads')
+        table = dynamodb.Table(get_table_name('THREADS'))
         response = table.get_item(
             Key={'conversation_id': conversation_id}
         )

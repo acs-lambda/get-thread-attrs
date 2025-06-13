@@ -3,31 +3,32 @@ import urllib3
 import logging
 from typing import Dict, Any, Optional
 from db import store_llm_invocation
+from config import get_together_ai_config, get_system_prompt, LOGGING_CONFIG
 
 # Set up logging
 logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+logger.setLevel(getattr(logging, LOGGING_CONFIG['LEVEL']))
 
 # Initialize urllib3 pool manager
 http = urllib3.PoolManager()
-
-TAI_URL = "https://api.together.xyz/v1/chat/completions"
-TAI_KEY = "YOUR_API_KEY"  # Replace with actual key from environment
 
 def get_thread_attributes(conversation_text: str, account_id: Optional[str] = None, conversation_id: Optional[str] = None) -> Dict[str, str]:
     """
     Get thread attributes by analyzing conversation text using LLM.
     Returns a dictionary of attributes.
     """
+    # Get Together AI configuration
+    tai_config = get_together_ai_config()
+    
     headers = {
-        "Authorization": f"Bearer {TAI_KEY}",
+        "Authorization": f"Bearer {tai_config['API_KEY']}",
         "Content-Type": "application/json"
     }
 
     messages = [
         {
             "role": "system",
-            "content": "You are a helpful assistant that analyzes email conversations and extracts key attributes. For each conversation, provide the following attributes in a clear format:\n\n1. sentiment: The overall sentiment of the conversation (positive, negative, neutral)\n2. urgency: How urgent the conversation is (high, medium, low)\n3. complexity: How complex the conversation is (high, medium, low)\n4. topic: The main topic of the conversation\n5. action_required: Whether any action is required (yes, no)\n\nProvide each attribute on a new line in the format 'attribute: value'"
+            "content": get_system_prompt('THREAD_ATTRIBUTES')
         },
         {
             "role": "user",
@@ -36,11 +37,11 @@ def get_thread_attributes(conversation_text: str, account_id: Optional[str] = No
     ]
 
     payload = {
-        "model": "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free",
+        "model": tai_config['MODEL'],
         "messages": messages,
-        "temperature": 0.1,
-        "max_tokens": 500,
-        "stop": ["<|im_end|>", "<|endoftext|>"],
+        "temperature": tai_config['TEMPERATURE'],
+        "max_tokens": tai_config['MAX_TOKENS'],
+        "stop": tai_config['STOP_SEQUENCES'],
         "stream": False
     }
 
@@ -48,7 +49,7 @@ def get_thread_attributes(conversation_text: str, account_id: Optional[str] = No
         encoded_data = json.dumps(payload).encode('utf-8')
         response = http.request(
             'POST',
-            TAI_URL,
+            tai_config['API_URL'],
             body=encoded_data,
             headers=headers
         )
