@@ -12,7 +12,7 @@ DYNAMODB_TABLES = {
 TOGETHER_AI = {
     'API_URL': 'https://api.together.xyz/v1/chat/completions',
     'API_KEY': os.environ.get('TAI_KEY', 'NULL'),  # Get from environment variable
-    'MODEL': 'meta-llama/Llama-3.3-70B-Instruct-Turbo-Free',
+    'MODEL': 'meta-llama/Llama-4-Maverick-17B-128E-Instruct-FP8',
     'TEMPERATURE': 0.1,
     'MAX_TOKENS': 500,
     'STOP_SEQUENCES': ['<|im_end|>', '<|endoftext|>']
