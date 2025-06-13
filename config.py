@@ -28,10 +28,10 @@ SYSTEM_PROMPTS = {
 4. Timeline: A 2-5 word description of the lead's timeline to buy
 
 Format your response exactly as:
-AI Summary: [summary]
-Budget Range: [budget]
-Preferred Property Types: [types]
-Timeline: [timeline]"""
+ai_summary: [summary]
+budget_range: [budget]
+preferred_property_types: [types]
+timeline: [timeline]"""
 }
 
 # Logging Configuration
