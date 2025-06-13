@@ -287,8 +287,8 @@ def get_and_increment_rate_limit(account_id: str, table_name: str) -> int:
             current_count = 0
             item_exists = False
         
-        # Calculate TTL (1 minute from now in milliseconds)
-        ttl = int((time.time() + 60) * 1000)
+        # Calculate TTL (1 minute from now in seconds)
+        ttl = int(time.time()) + 60
         
         # Update or create record with atomic increment
         if item_exists:
