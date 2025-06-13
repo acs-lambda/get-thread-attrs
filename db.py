@@ -218,3 +218,145 @@ def get_thread_account_id(conversation_id: str) -> Optional[str]:
         logger.error(f"  Table: {table.name}")
         logger.error(f"  Execution time: {time.time() - start_time:.2f} seconds")
         return None 
+
+def get_user_rate_limits(account_id: str) -> Dict[str, int]:
+    """
+    Get the rate limits for a user from the Users table.
+    Returns a dictionary with 'rl_aws' and 'rl_ai' limits.
+    """
+    start_time = time.time()
+    logger.info(f"Fetching rate limits for account: {account_id}")
+    
+    try:
+        table = dynamodb.Table(get_table_name('USERS'))
+        
+        if LOGGING_CONFIG['ENABLE_REQUEST_LOGGING']:
+            logger.info(f"Querying DynamoDB table: {table.name}")
+            logger.info(f"Query parameters: account_id = {account_id}")
+        
+        query_start = time.time()
+        response = table.get_item(
+            Key={'account_id': account_id}
+        )
+        query_duration = time.time() - query_start
+        
+        if LOGGING_CONFIG['ENABLE_PERFORMANCE_LOGGING']:
+            logger.info(f"DynamoDB query completed in {query_duration:.2f} seconds")
+        
+        if 'Item' not in response:
+            logger.warning(f"User not found for account {account_id}")
+            return {'rl_aws': 0, 'rl_ai': 0}
+            
+        item = response['Item']
+        rate_limits = {
+            'rl_aws': item.get('rl_aws', 0),
+            'rl_ai': item.get('rl_ai', 0)
+        }
+        
+        logger.info(f"Found rate limits for account {account_id}: AWS={rate_limits['rl_aws']}, AI={rate_limits['rl_ai']}")
+        return rate_limits
+        
+    except Exception as e:
+        logger.error(f"Error fetching user rate limits: {str(e)}", exc_info=True)
+        logger.error("Error context:")
+        logger.error(f"  Account ID: {account_id}")
+        logger.error(f"  Table: {table.name}")
+        logger.error(f"  Execution time: {time.time() - start_time:.2f} seconds")
+        return {'rl_aws': 0, 'rl_ai': 0}
+
+def get_and_increment_rate_limit(account_id: str, table_name: str) -> int:
+    """
+    Get the current invocation count and increment it for a given account.
+    Uses DynamoDB atomic increment operation.
+    Returns the new invocation count.
+    """
+    start_time = time.time()
+    logger.info(f"Getting and incrementing rate limit for account: {account_id} in table: {table_name}")
+    
+    try:
+        table = dynamodb.Table(get_table_name(table_name))
+        
+        # Try to get existing record
+        try:
+            response = table.get_item(
+                Key={'associated_account': account_id}
+            )
+            current_count = response.get('Item', {}).get('invocations', 0)
+            item_exists = 'Item' in response
+        except Exception:
+            current_count = 0
+            item_exists = False
+        
+        # Calculate TTL (1 minute from now in milliseconds)
+        ttl = int((time.time() + 60) * 1000)
+        
+        # Update or create record with atomic increment
+        if item_exists:
+            update_expression = "SET invocations = if_not_exists(invocations, :zero) + :inc"
+            expression_values = {
+                ':zero': 0,
+                ':inc': 1
+            }
+        else:
+            update_expression = "SET invocations = if_not_exists(invocations, :zero) + :inc, ttl = :ttl"
+            expression_values = {
+                ':zero': 0,
+                ':inc': 1,
+                ':ttl': ttl
+            }
+        
+        response = table.update_item(
+            Key={'associated_account': account_id},
+            UpdateExpression=update_expression,
+            ExpressionAttributeValues=expression_values,
+            ReturnValues='UPDATED_NEW'
+        )
+        
+        new_count = response['Attributes']['invocations']
+        logger.info(f"Updated rate limit for account {account_id} in {table_name}: {new_count}")
+        if not item_exists:
+            logger.info(f"Added TTL of {ttl} (1 minute from now) for new record")
+        return new_count
+        
+    except Exception as e:
+        logger.error(f"Error updating rate limit: {str(e)}", exc_info=True)
+        logger.error("Error context:")
+        logger.error(f"  Account ID: {account_id}")
+        logger.error(f"  Table: {table_name}")
+        logger.error(f"  Execution time: {time.time() - start_time:.2f} seconds")
+        return 0
+
+def check_rate_limit(account_id: str, limit_type: str) -> tuple[bool, int, int]:
+    """
+    Check if a rate limit has been exceeded for a given account.
+    Returns (is_exceeded, current_count, limit) tuple.
+    """
+    start_time = time.time()
+    logger.info(f"Checking {limit_type} rate limit for account: {account_id}")
+    
+    try:
+        # Get user's rate limits
+        rate_limits = get_user_rate_limits(account_id)
+        limit = rate_limits[f'rl_{limit_type.lower()}']
+        
+        # Get and increment current count
+        table_name = f'RL_{limit_type.upper()}'
+        current_count = get_and_increment_rate_limit(account_id, table_name)
+        
+        is_exceeded = current_count > limit
+        
+        logger.info(f"Rate limit check for {limit_type}:")
+        logger.info(f"  Account: {account_id}")
+        logger.info(f"  Current count: {current_count}")
+        logger.info(f"  Limit: {limit}")
+        logger.info(f"  Exceeded: {is_exceeded}")
+        
+        return is_exceeded, current_count, limit
+        
+    except Exception as e:
+        logger.error(f"Error checking rate limit: {str(e)}", exc_info=True)
+        logger.error("Error context:")
+        logger.error(f"  Account ID: {account_id}")
+        logger.error(f"  Limit type: {limit_type}")
+        logger.error(f"  Execution time: {time.time() - start_time:.2f} seconds")
+        return False, 0, 0 
