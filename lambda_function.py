@@ -1,6 +1,6 @@
 import json
 import time
-from config import logger, LOGGING_CONFIG
+from config import logger, LOGGING_CONFIG, AUTH_BP
 from utils import create_response, LambdaError
 from thread_logic import get_attributes_for_thread
 
@@ -17,11 +17,43 @@ def lambda_handler(event, context):
         try:
             body = json.loads(event['body'])
             conversation_id = body.get('conversationId')
+            account_id = body.get('accountId')
+            session_id = body.get('sessionId', AUTH_BP)  # Default to AUTH_BP if not provided
         except json.JSONDecodeError:
             raise LambdaError(400, "Invalid JSON in request body.")
         
         if not conversation_id:
             raise LambdaError(400, "Missing conversationId in request body.")
+        if not account_id:
+            raise LambdaError(400, "Missing accountId in request body.")
+
+        # Check authorization and rate limits if not using AUTH_BP
+        if session_id != AUTH_BP:
+            authorize(account_id, session_id)
+            # Check rate limits
+            rate_limit_response = invoke_lambda('RateLimitAWS', {
+                'client_id': account_id,
+                'session': session_id
+            })
+            
+            if rate_limit_response.get('statusCode') == 429:
+                logger.warning(f"Rate limit exceeded for account {account_id}")
+                return create_response(429, {
+                    'error': 'Rate limit exceeded',
+                    'message': 'You have exceeded your AWS API rate limit. Please try again later.'
+                })
+            elif rate_limit_response.get('statusCode') == 401:
+                logger.warning(f"Unauthorized request for account {account_id}")
+                return create_response(401, {
+                    'error': 'Unauthorized',
+                    'message': 'Invalid or expired session'
+                })
+            elif rate_limit_response.get('statusCode') != 200:
+                logger.error(f"Rate limit check failed: {rate_limit_response}")
+                return create_response(500, {
+                    'error': 'Rate limit check failed',
+                    'message': 'An error occurred while checking rate limits'
+                })
 
         attributes, account_id, email_count = get_attributes_for_thread(conversation_id)
         
