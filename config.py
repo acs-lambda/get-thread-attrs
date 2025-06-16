@@ -1,4 +1,5 @@
 import os
+import logging
 from typing import Dict, Any
 
 # DynamoDB Table Names
@@ -51,6 +52,14 @@ LOGGING_CONFIG = {
     'ENABLE_RESPONSE_LOGGING': True,
     'ENABLE_PERFORMANCE_LOGGING': True
 }
+
+# Add this to initialize the logger
+logging.basicConfig(
+    level=LOGGING_CONFIG['LEVEL'],
+    format=LOGGING_CONFIG['FORMAT'],
+    datefmt=LOGGING_CONFIG['DATE_FORMAT']
+)
+logger = logging.getLogger()
 
 # Lambda Configuration
 LAMBDA_CONFIG = {
