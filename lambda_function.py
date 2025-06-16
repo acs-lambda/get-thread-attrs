@@ -55,7 +55,7 @@ def lambda_handler(event, context):
                     'message': 'An error occurred while checking rate limits'
                 })
 
-        attributes, account_id, email_count = get_attributes_for_thread(conversation_id)
+        attributes, account_id, email_count = get_attributes_for_thread(conversation_id, account_id, session_id)
         
         processing_time = time.time() - start_time
         

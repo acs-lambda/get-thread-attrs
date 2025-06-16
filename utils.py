@@ -1,6 +1,6 @@
 import json
 import boto3
-from typing import Dict, Any
+from typing import Dict, Any, List
 from botocore.exceptions import ClientError
 from config import logger, AWS_REGION
 
@@ -113,5 +113,15 @@ def db_delete(table_name, key_name, key_value, index_name, account_id, session_i
         'table_name': table_name, 'key_name': key_name, 'key_value': key_value,
         'index_name': index_name, 'account_id': account_id, 'session_id': session_id
     }
-    response = invoke_lambda('db-delete', {'body': json.dumps(payload)})
-    return json.loads(response.get('body', '{}')) 
+    response = invoke_lambda('DBDelete', {'body': json.dumps(payload)})
+    return json.loads(response.get('body', '{}'))
+
+def format_conversation_for_llm(email_chain: List[Dict[str, Any]]) -> str:
+    """
+    Formats the email chain into a single string for LLM processing.
+    """
+    formatted_text = ""
+    for email in email_chain:
+        formatted_text += f"Subject: {email.get('subject', '')}\n"
+        formatted_text += f"Body: {email.get('body', '')}\n\n"
+    return formatted_text 

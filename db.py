@@ -13,7 +13,7 @@ logger.setLevel(getattr(logging, LOGGING_CONFIG['LEVEL']))
 # Initialize DynamoDB resource
 dynamodb = boto3.resource('dynamodb')
 
-def get_email_chain(conversation_id: str) -> List[Dict[str, Any]]:
+def get_email_chain(conversation_id: str, account_id: str, session_id: str) -> List[Dict[str, Any]]:
     """
     Retrieves and formats the email chain for a conversation.
     Returns a list of dictionaries with consistent 'subject' and 'body' keys.
@@ -22,13 +22,6 @@ def get_email_chain(conversation_id: str) -> List[Dict[str, Any]]:
     logger.info(f"Fetching email chain for conversation: {conversation_id}")
 
     try:
-        # This function assumes that the 'get_thread_account_id' has been called first
-        # to get the account_id for the session. A proper session object should be passed around.
-        # For now, we'll assume a dummy account_id and session_id for the purpose of this call.
-        # This should be updated with proper session management.
-        account_id = "dummy_account_id" # Replace with actual account_id from session
-        session_id = "dummy_session_id" # Replace with actual session_id
-        
         items = db_select(
             table_name=get_table_name('CONVERSATIONS'),
             index_name='conversation_id-index',
@@ -59,7 +52,7 @@ def get_email_chain(conversation_id: str) -> List[Dict[str, Any]]:
         
     except Exception as e:
         logger.error(f"Error fetching email chain: {str(e)}", exc_info=True)
-        return []
+        raise Exception(f"Failed to fetch email chain for conversation {conversation_id}: {str(e)}")
 
 def store_llm_invocation(
     associated_account: str,
