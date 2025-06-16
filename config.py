@@ -5,7 +5,8 @@ from typing import Dict, Any
 DYNAMODB_TABLES = {
     'CONVERSATIONS': 'Conversations',
     'THREADS': 'Threads',
-    'INVOCATIONS': 'Invocations'
+    'INVOCATIONS': 'Invocations',
+    'USERS': 'Users'
 }
 
 # Together AI Configuration
