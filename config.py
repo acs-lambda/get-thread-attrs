@@ -78,3 +78,8 @@ def get_together_ai_config() -> Dict[str, Any]:
 def get_system_prompt(prompt_key: str) -> str:
     """Helper function to get system prompt"""
     return SYSTEM_PROMPTS.get(prompt_key, '') 
+
+AUTH_BP = os.environ.get('AUTH_BP', '')
+
+if not AUTH_BP:
+    raise ValueError("AUTH_BP environment variable is not set")
