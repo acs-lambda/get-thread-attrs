@@ -80,6 +80,7 @@ def get_system_prompt(prompt_key: str) -> str:
     return SYSTEM_PROMPTS.get(prompt_key, '') 
 
 AUTH_BP = os.environ.get('AUTH_BP', '')
+AWS_REGION = os.environ.get('AWS_REGION', 'us-east-2')
 
 if not AUTH_BP:
     raise ValueError("AUTH_BP environment variable is not set")
